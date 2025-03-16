@@ -1,0 +1,111 @@
+- hosts: localhost
+  connection: local
+  become: false  # No sudo needed for most tasks
+
+  vars:
+    github_username: "keaz"
+    github_token: ""
+    projects_folder: "~/Development"
+
+  tasks:
+    # 1. Install Xcode Command Line Tools
+    - name: Check if Xcode Command Line Tools are installed
+      shell: "xcode-select -p"
+      register: xcode_check
+      ignore_errors: yes
+
+    - name: Install Xcode Command Line Tools if not installed
+      shell: "xcode-select --install"
+      when: xcode_check.rc != 0
+
+    - name: Wait for Xcode Command Line Tools installation to complete
+      shell: "until xcode-select -p &>/dev/null; do sleep 5; done"
+      when: xcode_check.rc != 0
+
+    # 2. Install Homebrew
+    - name: Check if Homebrew is installed
+      shell: "command -v brew"
+      register: brew_check
+      ignore_errors: yes
+
+    - name: Install Homebrew if not installed
+      shell: >
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      when: brew_check.rc != 0
+
+    - name: Ensure Homebrew is up-to-date
+      command: brew update
+      changed_when: false
+
+    - name: Add Homebrew taps
+      homebrew_tap:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - homebrew/cask
+        - homebrew/core
+        - adoptopenjdk/openjdk  # Example: Tap for OpenJDK
+        - keaz/homebrew
+    
+    # 3. Install essential packages
+    - name: Install development tools using Homebrew
+      homebrew:
+        name:
+          - git
+          - openjdk
+          - wget
+          - neovim
+          - mysql
+          - node
+          - nginx
+          - maven
+          - jq
+          - cmake
+          - eza
+          - fd
+          - git-delta
+          - gh
+          - gtk4
+          - htop
+          - yt-dlp
+          - tmux
+          - tmuxinnat
+        state: present
+
+    # 4. Install Rust    
+    - name: Check if Rust is installed
+      shell: "command -v rustc"
+      register: rust_check
+      ignore_errors: yes
+
+    - name: Install Rust using rustup
+      shell: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+      when: rust_check.rc != 0
+
+    - name: Install Rust
+      shell: rustup default stable
+      args:
+        creates: ~/.cargo/bin/rustc  # Prevents re-running if Rust is installed
+
+    # 5. Clone Git repositories
+    - name: Create Projects directory
+      file:
+        path: "{{ projects_folder }}"
+        state: directory
+
+    - name: Get all repositories from GitHub
+      uri:
+        url: "https://api.github.com/user/repos?per_page=100"
+        method: GET
+        headers:
+          Authorization: "token {{ github_token }}"
+          Accept: "application/vnd.github.v3+json"
+      register: github_repos
+
+    - name: Clone repositories from GitHub
+      git:
+        repo: "{{ item.clone_url }}"
+        dest: "{{ projects_dir }}/{{ item.name }}"
+        clone: yes
+        update: yes
+      loop: "{{ github_repos.json }}"
