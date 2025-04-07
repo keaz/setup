@@ -3,12 +3,41 @@
   become: false  # No sudo needed for most tasks
 
   vars:
-    github_username: "keaz"
-    github_token: ""
-    projects_folder: "~/Development"
+    homebrew_packages:
+      - git
+      - openjdk
+      - wget
+      - neovim
+      - mysql
+      - node
+      - nginx
+      - maven
+      - jq
+      - curl
+      - cmake
+      - eza
+      - fd
+      - git-delta
+      - gh
+      - gtk4
+      - htop
+      - yt-dlp
+      - tmux
+      - tmuxinator
+      - tmuxinator-completion
+      - docker
+      - docker-completion 
+      - fzf
+      - llvm
+      - python
+      - pipx
+    homebrew_casks:
+      - alacritty
+      - font-0xproto-nerd-font
+      - font-anonymice-nerd-font
+    projects_folder: "~/Projects"
 
   tasks:
-    # 1. Install Xcode Command Line Tools
     - name: Check if Xcode Command Line Tools are installed
       shell: "xcode-select -p"
       register: xcode_check
@@ -22,20 +51,21 @@
       shell: "until xcode-select -p &>/dev/null; do sleep 5; done"
       when: xcode_check.rc != 0
 
-    # 2. Install Homebrew
-    - name: Check if Homebrew is installed
-      shell: "command -v brew"
-      register: brew_check
-      ignore_errors: yes
+    - name: Ensure Homebrew is installed
+      community.general.homebrew:
+        state: present
 
-    - name: Install Homebrew if not installed
-      shell: >
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-      when: brew_check.rc != 0
+    - name: Install Homebrew formulae
+      community.general.homebrew:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ homebrew_packages }}"
 
-    - name: Ensure Homebrew is up-to-date
-      command: brew update
-      changed_when: false
+    - name: Install Homebrew cask applications
+      community.general.homebrew_cask:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ homebrew_casks }}"
 
     - name: Add Homebrew taps
       homebrew_tap:
@@ -44,68 +74,50 @@
       loop:
         - homebrew/cask
         - homebrew/core
-        - adoptopenjdk/openjdk  # Example: Tap for OpenJDK
+        - adoptopenjdk/openjdk
         - keaz/homebrew
     
-    # 3. Install essential packages
-    - name: Install development tools using Homebrew
-      homebrew:
-        name:
-          - git
-          - openjdk
-          - wget
-          - neovim
-          - mysql
-          - node
-          - nginx
-          - maven
-          - jq
-          - cmake
-          - eza
-          - fd
-          - git-delta
-          - gh
-          - gtk4
-          - htop
-          - yt-dlp
-          - tmux
-          - tmuxinnat
-        state: present
+    - name: Check if Rust is already installed
+      ansible.builtin.stat:
+        path: ~/.cargo/bin/rustup
+      register: rustup_installed
 
-    # 4. Install Rust    
-    - name: Check if Rust is installed
-      shell: "command -v rustc"
-      register: rust_check
-      ignore_errors: yes
+    - name: Install Rust using rustup (stable by default)
+      ansible.builtin.shell: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      when: not rustup_installed.stat.exists
 
-    - name: Install Rust using rustup
-      shell: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
-      when: rust_check.rc != 0
-
-    - name: Install Rust
-      shell: rustup default stable
+    - name: Install Rust nightly toolchain
+      ansible.builtin.shell: |
+        source $HOME/.cargo/env && rustup install nightly
       args:
-        creates: ~/.cargo/bin/rustc  # Prevents re-running if Rust is installed
+        executable: /bin/bash
 
-    # 5. Clone Git repositories
+    - name: Set Rust nightly as default (optional)
+      ansible.builtin.shell: |
+        source $HOME/.cargo/env && rustup default nightly
+      args:
+        executable: /bin/bash
+
+    - name: Show active Rust version
+      ansible.builtin.shell: |
+        source $HOME/.cargo/env && rustc --version
+      args:
+        executable: /bin/bash
+      register: rust_version
+      changed_when: false
+
+    - name: Display installed Rust version
+      ansible.builtin.debug:
+        msg: "Active Rust version: {{ rust_version.stdout }}"
+
     - name: Create Projects directory
       file:
         path: "{{ projects_folder }}"
         state: directory
 
-    - name: Get all repositories from GitHub
-      uri:
-        url: "https://api.github.com/user/repos?per_page=100"
-        method: GET
-        headers:
-          Authorization: "token {{ github_token }}"
-          Accept: "application/vnd.github.v3+json"
-      register: github_repos
-
-    - name: Clone repositories from GitHub
-      git:
-        repo: "{{ item.clone_url }}"
-        dest: "{{ projects_dir }}/{{ item.name }}"
-        clone: yes
-        update: yes
-      loop: "{{ github_repos.json }}"
+    - name: Run clone_and_organize.zsh
+      shell: ./clone_and_organize.zsh
+      args:
+        executable: /bin/zsh
+      environment:
+        GITHUB_TOKEN: "{{ lookup('env', 'GITHUB_TOKEN') }}"
