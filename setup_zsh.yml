@@ -1,0 +1,29 @@
+- name: Setup Oh My Zsh on macOS
+  hosts: localhost
+  become: false
+  gather_facts: true
+  vars:
+    oh_my_zsh_dir: "{{ ansible_env.HOME }}/.oh-my-zsh"
+    zsh_path: /bin/zsh
+
+  tasks:
+
+    - name: Ensure Zsh is installed via Homebrew (macOS)
+      homebrew:
+        name: zsh
+        state: present
+
+    - name: Install Oh My Zsh (macOS only)
+      shell: |
+        RUNZSH=no CHSH=no KEEP_ZSHRC=yes \
+        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+      args:
+        executable: /bin/zsh
+        creates: "{{ oh_my_zsh_dir }}"
+
+    - name: Set Zsh as default shell (macOS only)
+      user:
+        name: "{{ ansible_user_id }}"
+        shell: "{{ zsh_path }}"
+      become: true
+
