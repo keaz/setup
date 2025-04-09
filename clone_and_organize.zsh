@@ -29,7 +29,7 @@ repos=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
 # Iterate through each repository
 echo "$repos" | jq -c '.[]' | while read -r repo; do
     name=$(echo "$repo" | jq -r '.name')
-    clone_url=$(echo "$repo" | jq -r '.clone_url')
+    clone_url=$(echo "$repo" | jq -r '.ssh_url')
     language=$(echo "$repo" | jq -r '.language')
 
     # Handle unknown/null language

@@ -35,9 +35,11 @@
       - alacritty
       - font-0xproto-nerd-font
       - font-anonymice-nerd-font
+      - visual-studio-code
     projects_folder: "~/Projects"
 
   tasks:
+
     - name: Check if Xcode Command Line Tools are installed
       shell: "xcode-select -p"
       register: xcode_check
