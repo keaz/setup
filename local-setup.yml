@@ -31,6 +31,7 @@
       - llvm
       - python
       - pipx
+      - gnupg
     homebrew_casks:
       - alacritty
       - font-0xproto-nerd-font
@@ -123,3 +124,28 @@
         executable: /bin/zsh
       environment:
         GITHUB_TOKEN: "{{ lookup('env', 'GITHUB_TOKEN') }}"
+    
+    - name: Configure Git settings
+      ansible.builtin.copy:
+        dest: "{{ ansible_env.HOME }}/.gitconfig"
+        content: |
+          [user]
+              name = Kasun
+              email = kasun.ranasinghe@icloud.com
+          [pull]
+              rebase = true
+          [gpg]
+              program = /usr/local/bin/gpg
+          [commit]
+              gpgsign = true
+          [core]
+              pager = delta
+          [interactive]
+              difFilter = delta --color-only
+          [delta]
+              navigate = true
+              side-by-side = true
+          [merge]
+              conflictstyle = diff3
+          [diff]
+              colorMoved = default

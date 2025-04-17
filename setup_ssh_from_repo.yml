@@ -2,7 +2,7 @@
   hosts: localhost
   become: false
   vars:
-    github_user: "keaz"  
+    github_user: "keaz"
     config_repo: "config"
     temp_clone_path: "/tmp/config"
     ssh_source_path: "/tmp/config/.ssh"
@@ -11,12 +11,11 @@
     config_target_path: "{{ ansible_env.HOME }}/.config"
 
   tasks:
-
     - name: Ensure ~/.config directory exists
       file:
         path: "{{ ansible_env.HOME }}/.config"
         state: directory
-        mode: '0755'
+        mode: "0755"
 
     - name: Clone the config repo
       git:
@@ -29,13 +28,13 @@
       file:
         path: "{{ ssh_target_path }}"
         state: directory
-        mode: '0700'
+        mode: "0700"
 
     - name: Copy SSH keys to ~/.ssh
       copy:
         src: "{{ ssh_source_path }}/"
         dest: "{{ ssh_target_path }}/"
-        mode: '0600'
+        mode: "0600"
         owner: "{{ ansible_user_id }}"
         group: "{{ ansible_user_gid }}"
         remote_src: yes
@@ -44,8 +43,8 @@
       file:
         path: "{{ ssh_target_path }}"
         state: directory
-        mode: '0700'
-    
+        mode: "0700"
+
     - name: Copy .config contents to ~/.config
       copy:
         src: "{{ config_source_path }}/"
@@ -53,7 +52,6 @@
         mode: preserve
         remote_src: yes
 
-    # ---- Optional: Clean up cloned repo ----
     - name: Remove temporary clone directory
       file:
         path: "{{ temp_clone_path }}"

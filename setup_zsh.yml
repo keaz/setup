@@ -21,9 +21,96 @@
         executable: /bin/zsh
         creates: "{{ oh_my_zsh_dir }}"
 
-    - name: Set Zsh as default shell (macOS only)
-      user:
-        name: "{{ ansible_user_id }}"
-        shell: "{{ zsh_path }}"
-      become: true
+    - name: Configure Zsh plugins
+      lineinfile:
+        path: "{{ ansible_env.HOME }}/.zshrc"
+        regexp: '^plugins='
+        line: 'plugins=(git zsh-autosuggestions zsh-syntax-highlighting macos mvn rust)'
+        state: present
 
+    - name: Ensure Zsh plugins are installed
+      shell: |
+        git clone https://github.com/zsh-users/zsh-autosuggestions {{ oh_my_zsh_dir }}/custom/plugins/zsh-autosuggestions
+        git clone https://github.com/zsh-users/zsh-syntax-highlighting {{ oh_my_zsh_dir }}/custom/plugins/zsh-syntax-highlighting
+      args:
+        executable: /bin/zsh
+      creates: "{{ oh_my_zsh_dir }}/custom/plugins/zsh-autosuggestions"
+
+    - name: Ensure Oh My Zsh is sourced in .zshrc
+      lineinfile:
+        path: "{{ ansible_env.HOME }}/.zshrc"
+        line: 'source $ZSH/oh-my-zsh.sh'
+        state: present
+
+    - name: Add /usr/local/sbin to PATH in .zshrc
+      lineinfile:
+        path: "{{ ansible_env.HOME }}/.zshrc"
+        line: 'export PATH="/usr/local/sbin:$PATH"'
+        state: present
+
+    - name: Add fzf initialization to .zshrc
+      lineinfile:
+        path: "{{ ansible_env.HOME }}/.zshrc"
+        line: 'eval "$(fzf --zsh)"'
+        state: present
+
+    - name: Add fzf configuration to .zshrc
+      blockinfile:
+        path: "{{ ansible_env.HOME }}/.zshrc"
+        marker: "# {mark} fzf configuration"
+        block: |
+          export FZF_DEFAULT_OPTS="--color=fg:${fg},bg:${bg},hl:${purple},fg+:${fg},bg+:${bg_highlight},hl+:${purple},info:${blue},prompt:${cyan},pointer:${cyan},marker:${cyan},spinner:${cyan},header:${cyan}"
+
+          _fzf_compgen_path() {
+            fd --hidden --exclude .git . "$1"
+          }
+
+          _fzf_compgen_dir() {
+            fd --type=d --hidden --exclude .git . "$1"
+          }
+
+          show_file_or_dir_preview="if [ -d {} ]; then eza --tree --color=always {} | head -200; else bat -n --color=always --line-range :500 {}; fi"
+          export FZF_CTRL_T_OPTS="--preview '$show_file_or_dir_preview'"
+          export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always {} | head -200'"
+
+          _fzf_comprun() {
+            local command=$1
+            shift
+
+            case "$command" in
+              cd)           fzf --preview 'eza --tree --color=always {} | head -200' "$@" ;;
+              export|unset) fzf --preview "eval 'echo ${}'"         "$@" ;;
+              ssh)          fzf --preview 'dig {}'                   "$@" ;;
+              *)            fzf --preview "$show_file_or_dir_preview" "$@" ;;
+            esac
+          }
+
+    - name: Add fzf-git.sh source to .zshrc
+      lineinfile:
+        path: "{{ ansible_env.HOME }}/.zshrc"
+        line: 'source ~/fzf-git.sh/fzf-git.sh'
+        state: present
+
+    - name: Add eza alias to .zshrc
+      lineinfile:
+        path: "{{ ansible_env.HOME }}/.zshrc"
+        line: 'alias ls="eza --color=always --long --git --no-filesize --icons=always --no-time --no-user"'
+        state: present
+
+    - name: Add Zsh autosuggestions source to .zshrc
+      lineinfile:
+        path: "{{ ansible_env.HOME }}/.zshrc"
+        line: 'source /usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh'
+        state: present
+
+    - name: Add compinit to .zshrc
+      lineinfile:
+        path: "{{ ansible_env.HOME }}/.zshrc"
+        line: 'autoload -Uz compinit && compinit'
+        state: present
+
+    - name: Add RUST_BACKTRACE export to .zshrc
+      lineinfile:
+        path: "{{ ansible_env.HOME }}/.zshrc"
+        line: 'export RUST_BACKTRACE=full'
+        state: present
